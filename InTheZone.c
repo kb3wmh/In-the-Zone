@@ -40,38 +40,36 @@ bool Btn8DXmtr2Old = false;
 
 int tiltAngle;
 int liftAngle;
-int error;
-int startError;
+
+bool keepClawLevel = true;
+int clawTarget = 0;
+int clawError;
+int startErrorClaw;
 int tiltMotorSpeed = 0;
-float kp = 1.0;
+float kpClaw = 1.0;
+
+int liftError;
+int liftTarget = 0;
+int liftMotorSpeed;
+float kpLift = 0.0;
+
 bool allowPControl = true;
 bool pControlIsRunning = true;
 
-/*
-float liftTarget = 0;
-float coneLiftLeft;
-float coneLiftRight;
-float leftError = 0;
-float rightError = 0;
-float lastLeftError = 0;
-float lastRightError = 0;
+int firstLift = 0;
+int firstTilt = 0;
 
-float kP = .5;
-float kI = 0.0;
-float kD = 0.0;
+int secondLift = 0;
+int secondTilt = 0;
 
-float integralLimit = 20;
+int thirdLift = 0;
+int thirdTilt = 0;
 
-float integralLeft = 0;
-float derivativeLeft = 0;
+int fourthLift = 0;
+int fourthTilt = 0;
 
-float integralRight = 0;
-float derivativeRight = 0;
-
-float leftLiftSpeed = 0;
-float rightLiftSpeed = 0;
-*/
-bool isPlaying = false;
+int groundPickUpCone = 0;
+int preloadPickUpCone = 0;
 
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
@@ -191,14 +189,24 @@ int clawTiltEncoderToLiftEncoder(int clawTiltValue){
 task liftControl(){
 	tiltAngle = -1 * clawTiltEncoderToLiftEncoder(SensorValue(clawTiltAngle));
 	liftAngle = SensorValue(leftLift);
-	startError = tiltAngle - liftAngle;
+
+	if (keepClawLevel){
+		clawTarget = liftAngle;
+	}
+
+	startErrorClaw = tiltAngle - clawTarget;
 	pControlIsRunning = true;
+
 	while (true){
 		tiltAngle = -1 * clawTiltEncoderToLiftEncoder(SensorValue(clawTiltAngle));
-		liftAngle = SensorValue(leftLift);
-		error = tiltAngle - liftAngle - startError;
+		if (keepClawLevel){
+			clawTarget = SensorValue(leftLift) - startErrorClaw;
+		}
+		clawError = tiltAngle - clawTarget;
+		liftError = liftAngle - liftTarget;
 
-		tiltMotorSpeed = kp * error;
+		liftMotorSpeed = kpLift * liftError;
+		tiltMotorSpeed = kpClaw * clawError;
 
 		if (tiltMotorSpeed > 127){
 			tiltMotorSpeed = 127;
@@ -206,7 +214,18 @@ task liftControl(){
 		else if (tiltMotorSpeed < -127){
 			tiltMotorSpeed = -127;
 		}
+
+		if (liftMotorSpeed > 127){
+			liftMotorSpeed = 127;
+		}
+		else if (tiltMotorSpeed < -127){
+			liftMotorSpeed = -127;
+		}
+
 		motor[tiltClaw] = tiltMotorSpeed;
+		motor[leftConeLift] = liftMotorSpeed;
+		motor[rightConeLift] = liftMotorSpeed;
+
 		sleep(20);
 	}
 }
