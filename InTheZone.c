@@ -1,4 +1,8 @@
 #pragma config(I2C_Usage, I2C1, i2cSensors)
+#pragma config(Sensor, in1,    leftMGL,        sensorPotentiometer)
+#pragma config(Sensor, in2,    rightMGL,       sensorPotentiometer)
+#pragma config(Sensor, dgtl1,  leftDT,         sensorQuadEncoder)
+#pragma config(Sensor, dgtl3,  rightDT,        sensorQuadEncoder)
 #pragma config(Sensor, dgtl9,  clawTiltAngle,  sensorQuadEncoder)
 #pragma config(Sensor, dgtl11, mglLeft,        sensorQuadEncoder)
 #pragma config(Sensor, I2C_1,  leftLift,       sensorQuadEncoderOnI2CPort,    , AutoAssign )
@@ -30,6 +34,11 @@
 //Main competition background code...do not modify!
 #include "Vex_Competition_Includes.c"
 
+#define MGL_FLOOR = 0.0;
+#define MGL_RETRACT = 0.0;
+#define MGL_LOW_BAR = 0.0;
+#define MGL_HIGH_BAR = 0.0;
+
 int deadzone = 5;
 int mglMax = 0;
 int mglMin = -45;
@@ -53,6 +62,18 @@ int liftTarget = 0;
 int liftMotorSpeed;
 float kpLift = 0.0;
 
+int mglTarget;
+int rightMGLError;
+int rightMGLAngle;
+int leftMGLError;
+int leftMGLAngle;
+int leftMGLSpeed;
+int rightMGLSpeed;
+float kpMglLift = 0.0;
+
+bool mglPControlIsRunning = false;
+bool mglAllowPControl = true;
+
 bool allowPControl = true;
 bool pControlIsRunning = true;
 
@@ -70,6 +91,7 @@ int fourthTilt = 0;
 
 int groundPickUpCone = 0;
 int preloadPickUpCone = 0;
+
 
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
@@ -103,8 +125,8 @@ void raiseMGLift(){
 }
 
 void stopMGLift(){
-	motor[leftMGLift] = 10; //REMEMBER TO CHANGE BACK!!!
-	motor[rightMGLift] = 10;
+	motor[leftMGLift] = 0;
+	motor[rightMGLift] = 0;
 }
 
 void lowerMGLift(){
@@ -149,6 +171,12 @@ void stopTilt(){
 	motor[tiltClaw] = 0;
 }
 
+int inchesToTicks(float inches){
+	float numberOfRotations = inches / (2.0 * PI * 4.0);
+	int numTicks = numberOfRotations * 90;
+	return numTicks;
+}
+
 //////////////////////////////////////////////////////////////
 // Apply an exponential transformation to the joystick,     //
 // allowing for fine control at low values while still      //
@@ -185,6 +213,38 @@ int clawTiltEncoderToLiftEncoder(int clawTiltValue){
 
 /*-----PID Lift Control-----*/
 
+task mglControl(){
+	mglPControlIsRunning = true;
+	while (true){
+		rightMGLAngle = SensorValue(rightMGL);
+		leftMGLAngle = SensorValue(leftMGL);
+
+		rightMGLError = rightMGLAngle - mglTarget;
+		leftMGLError = leftMGLAngle - mglTarget;
+
+		rightMGLSpeed = kpMglLift * rightMGLError;
+		leftMGLSpeed = kpMglLift * leftMGLError;
+
+		if (leftMGLSpeed > 127){
+			leftMGLSpeed = 127;
+		}
+		if (leftMGLSpeed < -127){
+			leftMGLSpeed = -127;
+		}
+
+		if (rightMGLSpeed > 127){
+			rightMGLSpeed = 127;
+		}
+		if (rightMGLSpeed < -127){
+			rightMGLSpeed = -127;
+		}
+
+		motor[leftMGLift] = leftMGLSpeed;
+		motor[rightMGLift] = rightMGLSpeed;
+
+		sleep(20);
+	}
+}
 
 task liftControl(){
 	tiltAngle = -1 * clawTiltEncoderToLiftEncoder(SensorValue(clawTiltAngle));
@@ -230,62 +290,91 @@ task liftControl(){
 	}
 }
 
+float inchesToDrive = 0.0;
+
+int leftDTTarget;
+int rightDTTarget;
+
+int leftDTPos;
+int rightDTPos;
+int leftDTError;
+int rightDTError;
+int leftDTSpeed;
+int rightDTSpeed;
+int kpDt;
+
+task driveControl(){
+	leftDTPos = SensorValue(leftDT);
+	rightDTPos = SensorValue(rightDTPos);
+
+	leftDTTarget = leftDTPos + inchesToTicks(inchesToDrive);
+	rightDTTarget = rightDTPos + inchesToTicks(inchesToDrive);
+
+	while (true){
+		leftDTPos = SensorValue(leftDT);
+		rightDTPos = SensorValue(rightDTPos);
+
+		leftDTError = leftDTTarget - leftDTPos;
+		rightDTError = rightDTTarget - rightDTPos;
+
+		leftDTSpeed = kpDt * leftDTError;
+		rightDTSpeed = kpDt * rightDTError;
+
+		if (leftDTSpeed > 127){
+			leftDTSpeed = 127;
+		}
+		if (leftDTSpeed < -127){
+			leftDTSpeed = -127;
+		}
+
+		if (rightDTSpeed > 127){
+			rightDTSpeed = 127;
+		}
+		if (rightDTSpeed < -127){
+			leftDTSpeed = -127;
+		}
+
+		motor[frontLeftDT] = leftDTSpeed;
+		motor[backLeftDT] = leftDTSpeed;
+
+		motor[frontRightDT] = rightDTSpeed;
+		motor[backRightDT] = rightDTSpeed;
+
+		if (abs(leftDTError) < 10 && abs(rightDTError) < 10){
+			break;
+		}
+
+		sleep(20);
+	}
+}
 
 /*-----Autonomous-----*/
 
+int autonomousMode = 0;
+
 task autonomous()
 {
-	/*playSoundFile("music.wav");
-	lockClaw();
-	raiseConeLift();
-	while (SensorValue[rightLift] < 500){}
-	stopConeLift();
+	playSoundFile("music.wav");
 
-	lowerMGLift();
-	while (SensorValue[mglLeft] > mglMin){}
-	stopMGLift();
+	if (autonomousMode == 1){}
 
-	motor[frontRightDT] = 127;
-	motor[frontLeftDT] = 72;
-	motor[backRightDT] = 127;
-	motor[backLeftDT] = 72;
-	wait1Msec(2500);
-	motor[frontRightDT] = 0;
-	motor[frontLeftDT] = 0;
+	if (autonomousMode == 2){}
 
-	motor[backRightDT] = 0;
-	motor[backLeftDT] = 0;
+	if (autonomousMode == 3){}
 
-	lowerConeLift();
-	while (SensorValue[rightLift] > 200){}
-	stopConeLift();
+	if (autonomousMode == 4){}
 
-	openClaw();
-	wait1Msec(500);
-	stopClaw();
+	if (autonomousMode == 5){}
 
-	raiseConeLift();
-	while (SensorValue[rightLift] < 500){}
-	stopConeLift();
+	if (autonomousMode == 6){}
 
-	motor[frontRightDT] = -50;
-	motor[frontLeftDT] = -50;
-
-	motor[backRightDT] = -50;
-	motor[backLeftDT] = -50;
-	wait1Msec(1000);
-
-	motor[frontRightDT] = 0;
-	motor[frontLeftDT] = 0;
-
-	motor[backRightDT] = 0;
-	motor[backLeftDT] = 0;*/
 }
 
 /*-----Driver Control-----*/
 task usercontrol()
 {
 	startTask(liftControl);
+	startTask(mglControl);
 	while (true)
 	{
 		int leftStick = transformJoystick(vexRT[Ch3]);
@@ -297,20 +386,30 @@ task usercontrol()
 		motor[frontRightDT] = rightStick;
 		motor[backRightDT] = rightStick;
 
-		if (vexRT[Btn5U] == 1 && SensorValue[mglLeft] <= mglMax){
+		if (vexRT[Btn5U] == 1){
+			if (mglPControlIsRunning){
+				stopTask(mglControl);
+				mglPControlIsRunning = false;
+			}
 			raiseMGLift();
 		}
-		else if (vexRT[Btn5D] == 1 && SensorValue[mglLeft] >= mglMin){
+		else if (vexRT[Btn5D] == 1){
+			if (mglPControlIsRunning){
+				stopTask(mglControl);
+				mglPControlIsRunning = false;
+			}
 			lowerMGLift();
 		}
-		else if (vexRT[Btn8D] == 1){
-			lowerMGLift();
-		}
-		else if (vexRT[Btn8R] == 1){
-			raiseMGLift();
-		}
+
 		else{
-			stopMGLift();
+			if (!mglPControlIsRunning){
+				if (mglAllowPControl){
+					startTask(mglControl);
+				}
+				else{
+					stopMGLift();
+				}
+			}
 		}
 
 		if (vexRT[Btn6D] == 1){
