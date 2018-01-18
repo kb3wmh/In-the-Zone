@@ -41,7 +41,7 @@ bool Btn8DXmtr2Old = false;
 int tiltAngle;
 int liftAngle;
 
-bool keepClawLevel = true;
+bool keepClawLevel = false;
 int clawTarget = 0;
 int clawError;
 int startErrorClaw;
@@ -53,8 +53,8 @@ int liftTarget = 0;
 int liftMotorSpeed;
 float kpLift = 0.0;
 
-bool allowPControl = true;
-bool pControlIsRunning = true;
+bool allowPControl = false;
+bool pControlIsRunning = false;
 
 int firstLift = 0;
 int firstTilt = 0;
@@ -189,12 +189,12 @@ int clawTiltEncoderToLiftEncoder(int clawTiltValue){
 task liftControl(){
 	tiltAngle = -1 * clawTiltEncoderToLiftEncoder(SensorValue(clawTiltAngle));
 	liftAngle = SensorValue(leftLift);
-
+/*
 	if (keepClawLevel){
 		clawTarget = liftAngle;
-	}
+	}*/
 
-	startErrorClaw = tiltAngle - clawTarget;
+	startErrorClaw = liftAngle - tiltAngle;
 	pControlIsRunning = true;
 
 	while (true){
@@ -235,7 +235,22 @@ task liftControl(){
 
 task autonomous()
 {
-	/*playSoundFile("music.wav");
+	playSoundFile("music.wav");
+	motor[frontLeftDT] = 127;
+	motor[backLeftDT] = 127;
+
+	motor[frontRightDT] = 127;
+	motor[backRightDT] = 127;
+
+	wait1Msec(4300);
+
+	motor[frontLeftDT] = 0;
+	motor[backLeftDT] = 0;
+
+	motor[frontRightDT] = 0;
+	motor[backRightDT] = 0;
+
+/*playSoundFile("music.wav");
 	lockClaw();
 	raiseConeLift();
 	while (SensorValue[rightLift] < 500){}
@@ -285,7 +300,7 @@ task autonomous()
 /*-----Driver Control-----*/
 task usercontrol()
 {
-	startTask(liftControl);
+	//startTask(liftControl);
 	while (true)
 	{
 		int leftStick = transformJoystick(vexRT[Ch3]);
@@ -297,10 +312,10 @@ task usercontrol()
 		motor[frontRightDT] = rightStick;
 		motor[backRightDT] = rightStick;
 
-		if (vexRT[Btn5U] == 1 && SensorValue[mglLeft] <= mglMax){
+		if (vexRT[Btn5U] == 1){
 			raiseMGLift();
 		}
-		else if (vexRT[Btn5D] == 1 && SensorValue[mglLeft] >= mglMin){
+		else if (vexRT[Btn5D] == 1){
 			lowerMGLift();
 		}
 		else if (vexRT[Btn8D] == 1){
