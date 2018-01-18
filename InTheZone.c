@@ -1,10 +1,10 @@
 #pragma config(I2C_Usage, I2C1, i2cSensors)
-#pragma config(Sensor, in1,    leftMGL,        sensorPotentiometer)
-#pragma config(Sensor, in2,    rightMGL,       sensorPotentiometer)
-#pragma config(Sensor, dgtl1,  leftDT,         sensorQuadEncoder)
-#pragma config(Sensor, dgtl3,  rightDT,        sensorQuadEncoder)
+#pragma config(Sensor, in1,    rightMGL,       sensorPotentiometer)
+#pragma config(Sensor, in2,    leftMGL,        sensorPotentiometer)
+#pragma config(Sensor, dgtl5,  leftSideDist,   sensorSONAR_inch)
+#pragma config(Sensor, dgtl7,  rightDT,        sensorQuadEncoder)
 #pragma config(Sensor, dgtl9,  clawTiltAngle,  sensorQuadEncoder)
-#pragma config(Sensor, dgtl11, mglLeft,        sensorQuadEncoder)
+#pragma config(Sensor, dgtl11, leftDT,         sensorQuadEncoder)
 #pragma config(Sensor, I2C_1,  leftLift,       sensorQuadEncoderOnI2CPort,    , AutoAssign )
 #pragma config(Sensor, I2C_2,  rightLift,      sensorQuadEncoderOnI2CPort,    , AutoAssign )
 #pragma config(Motor,  port1,           claw,          tmotorVex393_HBridge, openLoop, reversed)
@@ -69,7 +69,7 @@ int leftMGLError;
 int leftMGLAngle;
 int leftMGLSpeed;
 int rightMGLSpeed;
-float kpMglLift = 0.0;
+float kpMglLift = 0.25;
 
 bool mglPControlIsRunning = false;
 bool mglAllowPControl = true;
@@ -212,6 +212,34 @@ int clawTiltEncoderToLiftEncoder(int clawTiltValue){
 }
 
 /*-----PID Lift Control-----*/
+/*
+typedef struct{
+	int leftMGLTarget;
+	int rightMGLTarget;
+} mglPos;
+
+mglPos top = {293, 3810};
+mglPos bottom = {1478, 2378};
+mglPos lowBar = {1460, 2529};
+
+mglPos nextPos = bottom;
+*/
+
+#define LEFT_MGL_BOTTOM  1478;
+#define RIGHT_MGL_BOTTOM  2378;
+
+#define LEFT_MGL_TOP  293;
+#define RIGHT_MGL_TOP  3810;
+
+#define LEFT_MGL_LOW_BAR 1340
+#define RIGHT_MGL_LOW_BAR  2740
+
+#define LEFT_MGL_HIGH_BAR 1116
+#define RIGHT_MGL_HIGH_BAR 2900
+
+
+int leftMGLTarget = LEFT_MGL_TOP;
+int rightMGLTarget = RIGHT_MGL_TOP;
 
 task mglControl(){
 	mglPControlIsRunning = true;
@@ -219,24 +247,24 @@ task mglControl(){
 		rightMGLAngle = SensorValue(rightMGL);
 		leftMGLAngle = SensorValue(leftMGL);
 
-		rightMGLError = rightMGLAngle - mglTarget;
-		leftMGLError = leftMGLAngle - mglTarget;
+		rightMGLError = -1 * (rightMGLAngle - rightMGLTarget);
+		//leftMGLError = leftMGLAngle - leftMGLTarget;
 
 		rightMGLSpeed = kpMglLift * rightMGLError;
-		leftMGLSpeed = kpMglLift * leftMGLError;
+		leftMGLSpeed = kpMglLift * rightMGLError;
 
-		if (leftMGLSpeed > 127){
-			leftMGLSpeed = 127;
+		if (leftMGLSpeed > 80){
+			leftMGLSpeed = 80;
 		}
-		if (leftMGLSpeed < -127){
-			leftMGLSpeed = -127;
+		if (leftMGLSpeed < -40){
+			leftMGLSpeed = -40;
 		}
 
-		if (rightMGLSpeed > 127){
-			rightMGLSpeed = 127;
+		if (rightMGLSpeed > 80){
+			rightMGLSpeed = 80;
 		}
-		if (rightMGLSpeed < -127){
-			rightMGLSpeed = -127;
+		if (rightMGLSpeed < -40){
+			rightMGLSpeed = -40;
 		}
 
 		motor[leftMGLift] = leftMGLSpeed;
@@ -301,7 +329,7 @@ int leftDTError;
 int rightDTError;
 int leftDTSpeed;
 int rightDTSpeed;
-int kpDt;
+float kpDt = 0.0;
 
 task driveControl(){
 	leftDTPos = SensorValue(leftDT);
@@ -312,9 +340,9 @@ task driveControl(){
 
 	while (true){
 		leftDTPos = SensorValue(leftDT);
-		rightDTPos = SensorValue(rightDTPos);
+		rightDTPos = SensorValue(rightDT);
 
-		leftDTError = leftDTTarget - leftDTPos;
+		leftDTError = leftDTTarget - leftDTPos + (rightDTPos - leftDTPos);
 		rightDTError = rightDTTarget - rightDTPos;
 
 		leftDTSpeed = kpDt * leftDTError;
@@ -327,11 +355,11 @@ task driveControl(){
 			leftDTSpeed = -127;
 		}
 
-		if (rightDTSpeed > 127){
-			rightDTSpeed = 127;
+		if (rightDTSpeed > 100){
+			rightDTSpeed = 100;
 		}
-		if (rightDTSpeed < -127){
-			leftDTSpeed = -127;
+		if (rightDTSpeed < -100){
+			leftDTSpeed = -100;
 		}
 
 		motor[frontLeftDT] = leftDTSpeed;
