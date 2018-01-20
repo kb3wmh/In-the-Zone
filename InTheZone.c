@@ -57,7 +57,7 @@ bool Btn8DXmtr2Old = false;
 int tiltAngle;
 int liftAngle;
 
-bool keepClawLevel = true;
+bool keepClawLevel = false;
 int clawTarget = 0;
 int clawError;
 int startErrorClaw;
@@ -235,6 +235,7 @@ task mglControl(){
 }
 
 bool controlConeLift = false;
+bool allowControlConeLift = false;
 
 task liftControl(){
 	tiltAngle = -1 * clawTiltEncoderToLiftEncoder(SensorValue(clawTiltAngle));
@@ -245,7 +246,7 @@ task liftControl(){
 
 	while (true){
 		tiltAngle = -1 * clawTiltEncoderToLiftEncoder(SensorValue(clawTiltAngle));
-		liftAngle = SensorValue(leftLift)
+		liftAngle = SensorValue(leftLift);
 		if (keepClawLevel){
 			clawError = tiltAngle - liftAngle - startErrorClaw;
 		}
@@ -392,6 +393,10 @@ task usercontrol()
 		else{
 			if (!mglPControlIsRunning){
 				if (mglAllowPControl){
+					stopMGLift();
+					wait1Msec(40);
+					leftMGLTarget = SensorValue(leftMGL);
+					rightMGLTarget = SensorValue(rightMGL);
 					startTask(mglControl);
 				}
 				else{
@@ -457,6 +462,26 @@ task usercontrol()
 			Btn8DXmtr2Old = false;
 		}
 
+		if (vexRT[Btn5UXmtr2] == 1){
+			leftMGLTarget = LEFT_MGL_TOP;
+			rightMGLTarget = RIGHT_MGL_TOP;
+		}
+
+		if (vexRT[Btn5DXmtr2] == 1){
+			leftMGLTarget = LEFT_MGL_BOTTOM;
+			rightMGLTarget = RIGHT_MGL_BOTTOM;
+		}
+
+		if (vexRT[Btn8UXmtr2] == 1){
+			leftMGLTarget = LEFT_MGL_HIGH_BAR;
+			rightMGLTarget = RIGHT_MGL_HIGH_BAR;
+		}
+		if (vexRT[Btn8LXmtr2] == 1){
+			leftMGLTarget = LEFT_MGL_LOW_BAR;
+			rightMGLTarget = RIGHT_MGL_LOW_BAR;
+		}
+
+
 		// Manually override claw tilt p-control
 		if (vexRT[Btn6UXmtr2] == 1){
 			if (pControlIsRunning){
@@ -474,7 +499,11 @@ task usercontrol()
 		}
 		else{
 			if (allowPControl && !pControlIsRunning){
+				if (!keepClawLevel){
+					clawTarget = SensorValue(clawTiltAngle);
+				}
 				startTask(liftControl);
+
 			}
 			if (!allowPControl){
 				stopTilt();
