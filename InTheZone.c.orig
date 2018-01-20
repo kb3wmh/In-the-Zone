@@ -34,17 +34,10 @@
 //Main competition background code...do not modify!
 #include "Vex_Competition_Includes.c"
 
-#define LEFT_MGL_BOTTOM  1478;
-#define RIGHT_MGL_BOTTOM  2378;
-
-#define LEFT_MGL_TOP  293;
-#define RIGHT_MGL_TOP  3810;
-
-#define LEFT_MGL_LOW_BAR 1340
-#define RIGHT_MGL_LOW_BAR  2740
-
-#define LEFT_MGL_HIGH_BAR 1116
-#define RIGHT_MGL_HIGH_BAR 2900
+#define MGL_FLOOR = 0.0;
+#define MGL_RETRACT = 0.0;
+#define MGL_LOW_BAR = 0.0;
+#define MGL_HIGH_BAR = 0.0;
 
 int deadzone = 5;
 int mglMax = 0;
@@ -57,7 +50,7 @@ bool Btn8DXmtr2Old = false;
 int tiltAngle;
 int liftAngle;
 
-bool keepClawLevel = true;
+bool keepClawLevel = false;
 int clawTarget = 0;
 int clawError;
 int startErrorClaw;
@@ -69,14 +62,17 @@ int liftTarget = 0;
 int liftMotorSpeed;
 float kpLift = 0.0;
 
+<<<<<<< HEAD
+bool allowPControl = false;
+bool pControlIsRunning = false;
+=======
+int mglTarget;
 int rightMGLError;
 int rightMGLAngle;
 int leftMGLError;
 int leftMGLAngle;
 int leftMGLSpeed;
 int rightMGLSpeed;
-int leftMGLTarget = LEFT_MGL_TOP;
-int rightMGLTarget = RIGHT_MGL_TOP;
 float kpMglLift = 0.25;
 
 bool mglPControlIsRunning = false;
@@ -84,6 +80,7 @@ bool mglAllowPControl = true;
 
 bool allowPControl = true;
 bool pControlIsRunning = true;
+>>>>>>> 6a2d3c03272651c862c30c8c9c012e92b8cfbc0e
 
 int firstLift = 0;
 int firstTilt = 0;
@@ -100,12 +97,31 @@ int fourthTilt = 0;
 int groundPickUpCone = 0;
 int preloadPickUpCone = 0;
 
+
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
+/*                                                                           */
+/*  You may want to perform some actions before the competition starts.      */
+/*  Do them in the following function.  You must return from this function   */
+/*  or the autonomous and usercontrol tasks will not be started.  This       */
+/*  function is only called once after the cortex has been powered on and    */
+/*  not every time that the robot is disabled.                               */
 /*---------------------------------------------------------------------------*/
+
 void pre_auton()
 {
+	// Set bStopTasksBetweenModes to false if you want to keep user created tasks
+	// running between Autonomous and Driver controlled modes. You will need to
+	// manage all user created tasks if set to false.
 	bStopTasksBetweenModes = true;
+
+	// Set bDisplayCompetitionStatusOnLcd to false if you don't want the LCD
+	// used by the competition include file, for example, you might want
+	// to display your team name on the LCD in this function.
+	// bDisplayCompetitionStatusOnLcd = false;
+
+	// All activities that occur before the competition starts
+	// Example: clearing encoders, setting servo positions, ...
 }
 
 void raiseMGLift(){
@@ -201,6 +217,34 @@ int clawTiltEncoderToLiftEncoder(int clawTiltValue){
 }
 
 /*-----PID Lift Control-----*/
+/*
+typedef struct{
+	int leftMGLTarget;
+	int rightMGLTarget;
+} mglPos;
+
+mglPos top = {293, 3810};
+mglPos bottom = {1478, 2378};
+mglPos lowBar = {1460, 2529};
+
+mglPos nextPos = bottom;
+*/
+
+#define LEFT_MGL_BOTTOM  1478;
+#define RIGHT_MGL_BOTTOM  2378;
+
+#define LEFT_MGL_TOP  293;
+#define RIGHT_MGL_TOP  3810;
+
+#define LEFT_MGL_LOW_BAR 1340
+#define RIGHT_MGL_LOW_BAR  2740
+
+#define LEFT_MGL_HIGH_BAR 1116
+#define RIGHT_MGL_HIGH_BAR 2900
+
+
+int leftMGLTarget = LEFT_MGL_TOP;
+int rightMGLTarget = RIGHT_MGL_TOP;
 
 task mglControl(){
 	mglPControlIsRunning = true;
@@ -209,6 +253,7 @@ task mglControl(){
 		leftMGLAngle = SensorValue(leftMGL);
 
 		rightMGLError = -1 * (rightMGLAngle - rightMGLTarget);
+		//leftMGLError = leftMGLAngle - leftMGLTarget;
 
 		rightMGLSpeed = kpMglLift * rightMGLError;
 		leftMGLSpeed = kpMglLift * rightMGLError;
@@ -234,26 +279,26 @@ task mglControl(){
 	}
 }
 
-bool controlConeLift = false;
-
 task liftControl(){
 	tiltAngle = -1 * clawTiltEncoderToLiftEncoder(SensorValue(clawTiltAngle));
 	liftAngle = SensorValue(leftLift);
+/*
+	if (keepClawLevel){
+		clawTarget = liftAngle;
+	}*/
 
-	startErrorClaw = tiltAngle - liftAngle;
+	startErrorClaw = liftAngle - tiltAngle;
 	pControlIsRunning = true;
 
 	while (true){
 		tiltAngle = -1 * clawTiltEncoderToLiftEncoder(SensorValue(clawTiltAngle));
-		liftAngle = SensorValue(leftLift)
 		if (keepClawLevel){
-			clawError = tiltAngle - liftAngle - startErrorClaw;
+			clawTarget = SensorValue(leftLift) - startErrorClaw;
 		}
-		if (controlConeLift){
-			liftError = liftAngle - liftTarget;
-			liftMotorSpeed = kpLift * liftError;
-		}
+		clawError = tiltAngle - clawTarget;
+		liftError = liftAngle - liftTarget;
 
+		liftMotorSpeed = kpLift * liftError;
 		tiltMotorSpeed = kpClaw * clawError;
 
 		if (tiltMotorSpeed > 127){
@@ -271,8 +316,8 @@ task liftControl(){
 		}
 
 		motor[tiltClaw] = tiltMotorSpeed;
-		//motor[leftConeLift] = liftMotorSpeed;
-		//motor[rightConeLift] = liftMotorSpeed;
+		motor[leftConeLift] = liftMotorSpeed;
+		motor[rightConeLift] = liftMotorSpeed;
 
 		sleep(20);
 	}
@@ -343,6 +388,67 @@ int autonomousMode = 0;
 task autonomous()
 {
 	playSoundFile("music.wav");
+<<<<<<< HEAD
+	motor[frontLeftDT] = 127;
+	motor[backLeftDT] = 127;
+
+	motor[frontRightDT] = 127;
+	motor[backRightDT] = 127;
+
+	wait1Msec(4300);
+
+	motor[frontLeftDT] = 0;
+	motor[backLeftDT] = 0;
+
+	motor[frontRightDT] = 0;
+	motor[backRightDT] = 0;
+
+/*playSoundFile("music.wav");
+	lockClaw();
+	raiseConeLift();
+	while (SensorValue[rightLift] < 500){}
+	stopConeLift();
+
+	lowerMGLift();
+	while (SensorValue[mglLeft] > mglMin){}
+	stopMGLift();
+
+	motor[frontRightDT] = 127;
+	motor[frontLeftDT] = 72;
+	motor[backRightDT] = 127;
+	motor[backLeftDT] = 72;
+	wait1Msec(2500);
+	motor[frontRightDT] = 0;
+	motor[frontLeftDT] = 0;
+
+	motor[backRightDT] = 0;
+	motor[backLeftDT] = 0;
+
+	lowerConeLift();
+	while (SensorValue[rightLift] > 200){}
+	stopConeLift();
+
+	openClaw();
+	wait1Msec(500);
+	stopClaw();
+
+	raiseConeLift();
+	while (SensorValue[rightLift] < 500){}
+	stopConeLift();
+
+	motor[frontRightDT] = -50;
+	motor[frontLeftDT] = -50;
+
+	motor[backRightDT] = -50;
+	motor[backLeftDT] = -50;
+	wait1Msec(1000);
+
+	motor[frontRightDT] = 0;
+	motor[frontLeftDT] = 0;
+
+	motor[backRightDT] = 0;
+	motor[backLeftDT] = 0;*/
+=======
 
 	if (autonomousMode == 1){}
 
@@ -356,13 +462,18 @@ task autonomous()
 
 	if (autonomousMode == 6){}
 
+>>>>>>> 6a2d3c03272651c862c30c8c9c012e92b8cfbc0e
 }
 
 /*-----Driver Control-----*/
 task usercontrol()
 {
+<<<<<<< HEAD
+	//startTask(liftControl);
+=======
 	startTask(liftControl);
 	startTask(mglControl);
+>>>>>>> 6a2d3c03272651c862c30c8c9c012e92b8cfbc0e
 	while (true)
 	{
 		int leftStick = transformJoystick(vexRT[Ch3]);
@@ -375,6 +486,14 @@ task usercontrol()
 		motor[backRightDT] = rightStick;
 
 		if (vexRT[Btn5U] == 1){
+<<<<<<< HEAD
+			raiseMGLift();
+		}
+		else if (vexRT[Btn5D] == 1){
+			lowerMGLift();
+		}
+		else if (vexRT[Btn8D] == 1){
+=======
 			if (mglPControlIsRunning){
 				stopTask(mglControl);
 				mglPControlIsRunning = false;
@@ -386,6 +505,7 @@ task usercontrol()
 				stopTask(mglControl);
 				mglPControlIsRunning = false;
 			}
+>>>>>>> 6a2d3c03272651c862c30c8c9c012e92b8cfbc0e
 			lowerMGLift();
 		}
 
