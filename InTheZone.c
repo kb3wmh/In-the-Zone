@@ -250,6 +250,10 @@ task liftControl(){
 		if (keepClawLevel){
 			clawError = tiltAngle - liftAngle - startErrorClaw;
 		}
+		else{
+			clawError = tiltAngle - clawTarget;
+		}
+
 		if (controlConeLift){
 			liftError = liftAngle - liftTarget;
 			liftMotorSpeed = kpLift * liftError;
@@ -345,7 +349,9 @@ task autonomous()
 {
 	playSoundFile("music.wav");
 
-	if (autonomousMode == 1){}
+	if (autonomousMode == 1){
+
+	}
 
 	if (autonomousMode == 2){}
 
